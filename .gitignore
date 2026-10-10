@@ -1,0 +1,5 @@
+pgdata_hw2/
+data_ml100k/
+.ipynb_checkpoints/
+.venv/
+__pycache__/
