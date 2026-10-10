@@ -1,0 +1,111 @@
+// ER-діаграма у форматі DBML — вставте у https://dbdiagram.io для інтерактивного перегляду.
+// Сценарій: Movie Recommendation (MovieLens 100K) + Feature Store (offline / online)
+
+Project movie_recommendation {
+  database_type: 'PostgreSQL'
+  Note: 'Business (3НФ) -> Offline feature store (SCD-2, [valid_from, valid_to)) -> Online feature store (денормалізований lookup)'
+}
+
+// ===================== BUSINESS / SOURCE (3НФ) =====================
+TableGroup business {
+  users
+  movies
+  genres
+  ratings
+  movie_genres
+}
+
+Table users {
+  user_id    integer     [pk]
+  age        smallint    [not null, note: 'CHECK 1..120']
+  gender     char(1)     [not null, note: "CHECK IN ('M','F')"]
+  occupation varchar(32) [not null]
+  zip_code   varchar(10) [not null]
+}
+
+Table movies {
+  movie_id     integer  [pk]
+  title        text     [not null]
+  release_year smallint [null, note: 'CHECK 1900..2100']
+}
+
+Table genres {
+  genre_id   smallint    [pk]
+  genre_name varchar(32) [not null, unique]
+}
+
+// Bridge N:M users <-> movies (взаємодія з часовою міткою)
+Table ratings {
+  user_id  integer     [not null, ref: > users.user_id]   // users 1 : 0..N ratings
+  movie_id integer     [not null, ref: > movies.movie_id] // movies 1 : 0..N ratings
+  rating   smallint    [not null, note: 'CHECK 1..5']
+  rated_at timestamptz [not null, note: 'UTC']
+  indexes {
+    (user_id, movie_id) [pk]
+    (user_id, rated_at)
+    movie_id
+  }
+}
+
+// Bridge N:M movies <-> genres
+Table movie_genres {
+  movie_id integer  [not null, ref: > movies.movie_id] // movies 1 : 1..N movie_genres
+  genre_id smallint [not null, ref: > genres.genre_id] // genres 1 : 0..N movie_genres
+  indexes {
+    (movie_id, genre_id) [pk]
+  }
+}
+
+// ===================== OFFLINE FEATURE STORE =====================
+TableGroup offline_feature_store {
+  user_features_offline
+  training_events
+}
+
+Table user_features_offline {
+  user_id           integer      [not null, ref: > users.user_id]  // users 1 : 0..N versions
+  valid_from        timestamptz  [not null, note: 'inclusive']
+  valid_to          timestamptz  [null, note: 'exclusive; NULL = current version']
+  ratings_cnt_total integer      [not null, note: 'CHECK >= 0']
+  ratings_cnt_30d   integer      [not null, note: 'CHECK 0..ratings_cnt_total']
+  avg_rating        numeric(3,2) [null, note: 'CHECK 1..5']
+  favorite_genre_id smallint     [null, ref: > genres.genre_id]   // genres 0..1 : 0..N
+  indexes {
+    (user_id, valid_from) [pk]
+    (user_id, valid_from) [name: 'idx_user_features_asof', note: 'valid_from DESC']
+  }
+  Note: 'CHECK (valid_to IS NULL OR valid_to > valid_from); trigger forbids overlapping versions per user_id'
+}
+
+Table training_events {
+  event_id      bigint      [pk, increment]
+  user_id       integer     [not null, ref: > users.user_id]   // users 1 : 0..N
+  movie_id      integer     [not null, ref: > movies.movie_id] // movies 1 : 0..N
+  prediction_ts timestamptz [not null]
+  target_rating smallint    [not null, note: 'CHECK 1..5']
+  is_liked      boolean     [not null, note: 'TARGET = (target_rating >= 4)']
+  indexes {
+    (user_id, movie_id) [unique]
+    (user_id, prediction_ts)
+  }
+  Note: 'AS-OF JOIN -> user_features_offline ON user_id AND valid_from <= prediction_ts < valid_to (N : 0..1)'
+}
+
+// ===================== ONLINE FEATURE STORE =====================
+TableGroup online_feature_store {
+  user_features_online
+}
+
+Table user_features_online {
+  user_id             integer      [pk, ref: - users.user_id] // users 1 : 0..1
+  age                 smallint     [not null, note: 'denormalized copy of users']
+  gender              char(1)      [not null, note: 'denormalized copy of users']
+  occupation          varchar(32)  [not null, note: 'denormalized copy of users']
+  ratings_cnt_total   integer      [not null]
+  ratings_cnt_30d     integer      [not null]
+  avg_rating          numeric(3,2) [null]
+  favorite_genre_name varchar(32)  [null, note: 'denormalized copy of genres.genre_name']
+  feature_ts          timestamptz  [not null, note: '= valid_from of materialized offline version']
+  updated_at          timestamptz  [not null, default: `now()`]
+  Note: 'Materialized from user_features_offline WHERE valid_to IS NULL (UPSERT ON CONFLICT)'
+}
