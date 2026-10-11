@@ -1,5 +1,38 @@
-pgdata_hw2/
-data_ml100k/
-.ipynb_checkpoints/
-.venv/
+# --- Python ---
 __pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Jupyter / Colab ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+.virtual_documents/
+sample_data/
+
+# --- Local PostgreSQL data & dumps ---
+pgdata*/
+*.dump
+*.backup
+
+# --- Datasets (дані вбудовані в notebook; сирі файли не комітимо) ---
+data/
+ml-100k/
+ml-100k.zip
+*.csv
+*.parquet
+
+# --- Secrets ---
+.env
+.env.*
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
