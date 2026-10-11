@@ -1,0 +1,14 @@
+# Python 3.10+ (Google Colab: 3.12)
+# PostgreSQL 16 itself is a system dependency, not a pip package (see README).
+
+# SQL client stack used by the notebook
+SQLAlchemy>=2.0,<3
+psycopg2-binary>=2.9
+pandas>=2.0
+
+# %%sql cell magic (ipython-sql; prettytable is pinned via SqlMagic.style)
+ipython-sql==0.5.0
+prettytable>=3.10
+
+# Running the notebook locally
+jupyterlab>=4.0
