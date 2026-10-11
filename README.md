@@ -1,4 +1,4 @@
-# goit-rdb-hw-02 · Feature Store для Movie Recommendation
+# Homework #2: Feature Store для Movie Recommendation
 ---
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Dimaxdm/goit-rdb-hw-02/blob/main/hw02_movie_recommendation.ipynb)
